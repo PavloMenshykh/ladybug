@@ -2,7 +2,7 @@
 #
 # This file is part of Ladybug.
 #
-# Copyright (c) 2013-2015, ....(YOUR NAME).... <....(YOUR EMAIL)....>
+# Copyright (c) 2013-2019, Mykola Holovko <m@holovko.co>, Pavlo Menshykh <pavlo.menshykh@gmail.com>
 # Ladybug is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published
 # by the Free Software Foundation; either version 3 of the License,
@@ -20,7 +20,7 @@
 
 
 """
-Use this component to check uninterupted and interrupted sunlight hours, as required by ua and rus building codes 
+Use this component to check uninterrupted and interrupted sunlight hours, as required by Ukrainian and CIS building codes 
 -
 Provided by Ladybug 0.0.67
 
@@ -28,23 +28,24 @@ Provided by Ladybug 0.0.67
         _timeStep_: The number of timesteps per hour used by the sunPath component that generated the sun vectors. This number should be smaller than 60 and divisible by 60. The default is set to 1 such that one ssun vector is generated for each hour.
         _geometry: Geometry for which sunlight hours analysis will be conducted.  Geometry must be either a Brep, a Mesh or a list of Breps or Meshes.
         _sunIsVisible: A grafted data stream for each test point with a "1" for each hour of the sunVectors that the sun is visible and a "0" for each hour of the sunVectors when the sun is blocked.
-        _timeInterrupted: Required amount of time by building code for interrupted insolation. Value in hours.
         _timeUninterrupted: Required amount of time by building code for uninterrupted insolation. Value in hours.
     Returns:
         readMe!: ...
         analysisMesh: An uncolored mesh representing the test _geometry that will be analyzed.  Connect this output to a "Mesh" grasshopper component to preview this output seperately from the others of this component. Note that this mesh is generated before the analysis is run, allowing you to be sure that the right geometry will be run through the analysis before running this component.
-        solarInterrupted: Interupted sunlight hours. In hours.
-        solarUninterrupted: Uninterrupted sunlight hours. In hours.
+        sunlightHoursResult: The number of hours of uninterrupted and innterrupted sunlight received by each of the test points of the input test _geometry.
+        isInterrupted: An index refering to one of _geometry conditions:
+            0 - uninterrupted
+            1 - interrupted
 """
 
-ghenv.Component.Name = "sunlightHours-ua-rus"
-ghenv.Component.NickName = 'sunlightHours'
+ghenv.Component.Name = "Ladybug_sunlightHours UA CIS"
+ghenv.Component.NickName = 'isInterrupted'
 ghenv.Component.Message = 'VER 0.0.67\nSEP_29_2019'
 ghenv.Component.Category = "Ladybug"
-ghenv.Component.SubCategory = "6 | WIP"
+ghenv.Component.SubCategory = "7 | WIP"
 #compatibleLBVersion = VER 0.0.59\nJAN_24_2016
 #row in a section, set to 1
-try: ghenv.Component.AdditionalHelpFromDocStrings = "1"
+try: ghenv.Component.AdditionalHelpFromDocStrings = "2"
 except: pass
 
 #gh libs
@@ -63,9 +64,9 @@ def checkTheInputs():
     else:
         return False
 
-def main(timestep, geometry, sunisvisible, timeint, timeunint):
+def main(timestep, geometry, sunisvisible, timedir):
     #set output dict
-    result = {"analysismesh":[], "solarinterrupted":[], "solaruninterrupted":[]}
+    result = {"analysismesh":[], "hours":[], "isinterrupted":[]}
     
     #===clean the geometry and bring them to rhinoCommon separated as mesh and Brep===
     analysisMesh, analysisBrep = lb_preparation.cleanAndCoerceList(geometry)
@@ -83,6 +84,8 @@ def main(timestep, geometry, sunisvisible, timeint, timeunint):
     #===prepare sunvisible===
     sun_1 = sunisvisible[:-1]
     sun_2 = sunisvisible[1:]
+    fray = sunisvisible[1]
+    vsun = len(sunisvisible)/timestep
     
     #mass addition
     sun_addition = [sum(i) for i in zip(sun_1, sun_2)]
@@ -117,24 +120,33 @@ def main(timestep, geometry, sunisvisible, timeint, timeunint):
         #dispatch computed values and convert to hour values
         rays_dispatched = [i/timestep for i, p in zip(rays_substraction , pattern) if p == 1]
         
-        """check if any value passes the uninterrupted time norms, if yes return
-        else check for uninterrupted time pass"""
-        
+        """check if any value passes the direct time norms, if yes return
+        else check for direct time pass"""
         #filter out single values
         #result is output as a single value list for consistency in trees
         if len(rays_dispatched) < 2:
-            result["solaruninterrupted"] = [round(rays_dispatched[0], 2)]
+            result["hours"] = [round(rays_dispatched[0], 2)]
+            result["isinterrupted"] = 0
         else:
-            #check if the largest value passes the uninterrupted requirements:
-            if sorted(rays_dispatched, reverse=True)[0] > timeunint:
-                result["solaruninterrupted"] = [sorted(rays_dispatched, reverse=True)[0]]
-                
+            #check if the largest value passes the direct requirements:
+            if sorted(rays_dispatched, reverse=True)[0] >= timedir:
+                result["hours"] = [sorted(rays_dispatched, reverse=True)[0]]
+                result["isinterrupted"] = 0
             #return interrupted result
             else:
                 #consecutive pairs
                 conpairs = [i+n for i, n in zip(rays_dispatched[:-1], rays_dispatched[1:])]
-                result["solarinterrupted"] = [sorted(conpairs, reverse=True)[0]]
-                
+                result["hours"] = [sorted(conpairs, reverse=True)[0]]
+                result["isinterrupted"] = 1
+    #nonchange condition:
+    else: 
+        #check if insolated:
+        if fray == 0:
+            result["hours"] = 0
+            result["isinterrupted"] = 0
+        else:
+            result["hours"] = vsun
+            result["isinterrupted"] = 0
     #transfer mesh
     result["analysismesh"] = analysisSrfs
     
@@ -167,8 +179,8 @@ else:
 if initCheck:
     checkData = checkTheInputs()
     if checkData:
-        result = main(_timeStep_, _geometry, _sunIsVisible, _timeInterrupted, _timeUninterrupted)
+        result = main(_timeStep_, _geometry, _sunIsVisible, _timeUninterrupted)
         
         analysisMesh = result["analysismesh"]
-        solarInterrupted = result["solarinterrupted"]
-        solarUninterrupted = result["solaruninterrupted"]
+        sunlightHoursResult = result["hours"]
+        isInterrupted = bool(result["isinterrupted"])
