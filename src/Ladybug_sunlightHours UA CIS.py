@@ -84,8 +84,9 @@ def main(timestep, geometry, sunisvisible, timedir):
     #===prepare sunvisible===
     sun_1 = sunisvisible[:-1]
     sun_2 = sunisvisible[1:]
+    
+    #define visibility condition
     fray = sunisvisible[1]
-    vsun = len(sunisvisible)/timestep
     
     #mass addition
     sun_addition = [sum(i) for i in zip(sun_1, sun_2)]
@@ -145,7 +146,7 @@ def main(timestep, geometry, sunisvisible, timedir):
             result["hours"] = 0
             result["isinterrupted"] = 0
         else:
-            result["hours"] = vsun
+            result["hours"] = len(sunisvisible)/timestep
             result["isinterrupted"] = 0
     #transfer mesh
     result["analysismesh"] = analysisSrfs
