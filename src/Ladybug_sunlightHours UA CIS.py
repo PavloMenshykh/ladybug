@@ -42,7 +42,7 @@ ghenv.Component.Name = "Ladybug_sunlightHours UA CIS"
 ghenv.Component.NickName = 'isInterrupted'
 ghenv.Component.Message = 'VER 0.0.67\nSEP_29_2019'
 ghenv.Component.Category = "Ladybug"
-ghenv.Component.SubCategory = "7 | WIP"
+ghenv.Component.SubCategory = "8 | Extra UA CIS"
 #compatibleLBVersion = VER 0.0.59\nJAN_24_2016
 #row in a section, set to 1
 try: ghenv.Component.AdditionalHelpFromDocStrings = "2"
@@ -84,9 +84,9 @@ def main(timestep, geometry, sunisvisible, timedir):
     #===prepare sunvisible===
     sun_1 = sunisvisible[:-1]
     sun_2 = sunisvisible[1:]
-    
-    #define visibility condition
     fray = sunisvisible[1]
+    vsun = len(sunisvisible)/timestep
+    
     
     #mass addition
     sun_addition = [sum(i) for i in zip(sun_1, sun_2)]
@@ -126,18 +126,18 @@ def main(timestep, geometry, sunisvisible, timedir):
         #filter out single values
         #result is output as a single value list for consistency in trees
         if len(rays_dispatched) < 2:
-            result["hours"] = [round(rays_dispatched[0], 2)]
+            result["hours"] = round(rays_dispatched[0], 2)
             result["isinterrupted"] = 0
         else:
             #check if the largest value passes the direct requirements:
             if sorted(rays_dispatched, reverse=True)[0] >= timedir:
-                result["hours"] = [sorted(rays_dispatched, reverse=True)[0]]
+                result["hours"] = sorted(rays_dispatched, reverse=True)[0]
                 result["isinterrupted"] = 0
             #return interrupted result
             else:
                 #consecutive pairs
                 conpairs = [i+n for i, n in zip(rays_dispatched[:-1], rays_dispatched[1:])]
-                result["hours"] = [sorted(conpairs, reverse=True)[0]]
+                result["hours"] = sorted(conpairs, reverse=True)[0]
                 result["isinterrupted"] = 1
     #nonchange condition:
     else: 
@@ -146,7 +146,7 @@ def main(timestep, geometry, sunisvisible, timedir):
             result["hours"] = 0
             result["isinterrupted"] = 0
         else:
-            result["hours"] = len(sunisvisible)/timestep
+            result["hours"] = vsun
             result["isinterrupted"] = 0
     #transfer mesh
     result["analysismesh"] = analysisSrfs
